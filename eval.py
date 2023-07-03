@@ -1,7 +1,6 @@
 import torch
-from sentence_transformers import util
+from sentence_transformers import util, SentenceTransformer, models
 import csv
-
 
 def evaluate_embedding(model, a, b):
     """
@@ -44,7 +43,7 @@ def trad_simple_example(model):
     return cos_sim
 
 
-def test_model(model):
+def eval_model(model):
     trad, simple = [], []
     with open("data/char_test.csv", "rt", encoding='UTF-8') as csvfile:
         reader = csv.DictReader(csvfile)
@@ -68,9 +67,14 @@ def test_model(model):
     print(cossim)
 
 
-if __name__ == "main":
-    PATH = './checkpoint/'
-    # implement the code of loading model here
-    model = torch.load(PATH)
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    test_model(model)
+# It is just an example here.
+# You may want to modify the model names and the PATH.
+
+for model_name in ['model_after_ctext', 'model_after_traditional_simple_parallel', 'model_after_cam_parallel']:
+    PATH = './finetuned_model/' + model_name
+    print(f"loading model {model_name}...")
+    model = SentenceTransformer(PATH).to(device)
+    print(f"Testing model {model_name}......")
+    eval_model(model)

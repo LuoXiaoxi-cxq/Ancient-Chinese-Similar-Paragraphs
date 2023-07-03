@@ -1,11 +1,12 @@
 import pandas as pd
-from sentence_transformers import util
+from sentence_transformers import util, SentenceTransformer
 import csv
 import time
 import torch
+from function import empty_cache
 
 
-def make_corpus(max_size=None):
+def make_corpus(max_size=-1):
     """
     make the content for clustering
     :param max_size: the max size of sentences to cluster, default none
@@ -27,25 +28,25 @@ def make_corpus(max_size=None):
                 corpus_sentences.append(row['内容'])
                 corpus_dict[cnt] = [row['段落'], row['小句'], row['内容']]
                 cnt += 1
-                if max_size is not None and cnt > max_size:
-                    break
+                if 0 < max_size < cnt:
+                    print("reach max_size, stop")
+                    return corpus_sentences, corpus_dict
     return corpus_sentences, corpus_dict
 
 
-def cluster(model, model_name, batchsize=64):
+def cluster(model, model_name, batchsize=64, max_size=-1):
     """
     Cluster with a specific model. Save the clustering result under './result/clustering/'.
     :param model: the model used for clustering
     """
-    assert model_name in ['ctext_parallel_pair', 'char_train', 'cam_train']
-    corpus, corpus_dict = make_corpus()
+    corpus, corpus_dict = make_corpus(max_size)
     corpus_embeddings = model.encode(corpus, batch_size=batchsize, show_progress_bar=True, convert_to_tensor=True)
-    print("Start clustering")
+    print(f"Start clustering, {len(corpus)} sentences in total")
     start_time = time.time()
 
     # 'threshold' Parameters to tune:
     # Only consider sentence pairs with a cosine-similarity larger than threshold as similar
-    clusters = util.community_detection(corpus_embeddings, min_community_size=2, threshold=0.92)
+    clusters = util.community_detection(corpus_embeddings, min_community_size=2, threshold=0.8)
 
     print("Clustering done after {:.2f} sec".format(time.time() - start_time))
 
@@ -61,9 +62,15 @@ def cluster(model, model_name, batchsize=64):
     df_cluster.to_excel('./result/clustering/' + model_name + '.xlsx', index=False)
 
 
-if __name__ == "main":
-    PATH = './checkpoint/'
-    # implement the code of loading model here
-    model = torch.load(PATH)
-    model_name = ''
+device = "cuda" if torch.cuda.is_available() else "cpu"
+empty_cache()
+
+# It is just an example here.
+# You may want to modify the model names and the PATH.
+
+for model_name in ['model_after_traditional_simple_parallel']:
+    PATH = './finetuned_model/' + model_name
+    print(f"loading model {model_name}...")
+    model = SentenceTransformer(PATH).to(device)
     cluster(model, model_name)
+    empty_cache()
